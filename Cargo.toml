@@ -1,0 +1,28 @@
+[package]
+name = "nota"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "nota"
+path = "src/main.rs"
+
+[dependencies]
+clap          = { version = "4",    features = ["derive"] }
+clap_complete = "4"
+chrono        = { version = "0.4",  features = ["serde"] }
+git2          = { version = "0.19", default-features = false }
+serde         = { version = "1",    features = ["derive"] }
+serde_yaml    = "0.9"
+colored       = "2"
+uuid          = { version = "1",    features = ["v4"] }
+walkdir       = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip         = true
+lto           = true
+opt-level     = "z"
+codegen-units = 1

@@ -1,0 +1,17 @@
+# Rust build artefacts
+/target/
+
+# Cargo lock is committed for binaries (keep it)
+# Cargo.lock
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment overrides
+.env
