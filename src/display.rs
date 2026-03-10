@@ -138,6 +138,16 @@ pub fn print_log_table(groups: &[RepoGroup], _config: &DisplayConfig) {
     }
 }
 
+pub fn print_changed_files(files: &[String]) {
+    if files.is_empty() {
+        return;
+    }
+    println!("\n{}", "── staged files ─────────────────────".dimmed());
+    for f in files {
+        println!("  {}", f.dimmed());
+    }
+}
+
 pub fn print_stats(stats: &NoteStats) {
     println!("{}", "── nota stats ──────────────────────".dimmed());
     println!(

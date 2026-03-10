@@ -273,6 +273,7 @@ mod tests {
                 git_repo: repo.to_string(),
                 git_branch: branch.to_string(),
                 tags: tags.into_iter().map(String::from).collect(),
+                changed_files: Vec::new(),
             },
             body: body.to_string(),
             file_path: PathBuf::from(format!("/tmp/{}.md", id)),

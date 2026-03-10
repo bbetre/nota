@@ -8,11 +8,14 @@ pub struct NoteContext {
     pub directory: String,
     pub git_repo: String,
     pub git_branch: String,
+    /// Paths of staged files relative to the repo root. Empty outside git repos
+    /// or when nothing is staged.
+    pub changed_files: Vec<String>,
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Capture the current environment. Always succeeds — git failures fall back to "none".
+/// Capture the current environment. Always succeeds — git failures fall back gracefully.
 pub fn capture_context() -> NoteContext {
     let directory = env::current_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
@@ -21,24 +24,26 @@ pub fn capture_context() -> NoteContext {
 
     let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
 
-    let (git_repo, git_branch) = capture_git_context(&directory)
-        .unwrap_or_else(|_| ("none".to_string(), "none".to_string()));
+    let (git_repo, git_branch, changed_files) = capture_git_context(&directory)
+        .unwrap_or_else(|_| ("none".to_string(), "none".to_string(), Vec::new()));
 
     NoteContext {
         timestamp,
         directory,
         git_repo,
         git_branch,
+        changed_files,
     }
 }
 
 // ── Git context ───────────────────────────────────────────────────────────────
 
-fn capture_git_context(dir: &str) -> Result<(String, String), git2::Error> {
+fn capture_git_context(dir: &str) -> Result<(String, String, Vec<String>), git2::Error> {
     let repo = git2::Repository::discover(dir)?;
     let branch = get_branch(&repo);
     let repo_name = get_repo_name(&repo);
-    Ok((repo_name, branch))
+    let staged = get_staged_files(&repo);
+    Ok((repo_name, branch, staged))
 }
 
 fn get_branch(repo: &git2::Repository) -> String {
@@ -46,6 +51,44 @@ fn get_branch(repo: &git2::Repository) -> String {
         Ok(head) if head.is_branch() => head.shorthand().unwrap_or("none").to_string(),
         _ => "none".to_string(), // detached HEAD or error
     }
+}
+
+/// Returns paths of staged files relative to the repo root.
+///
+/// Uses the same approach as `git diff --cached --name-only`: compares HEAD
+/// tree against the index (staging area). On a repo with no commits yet we
+/// pass `None` as the old tree, which diffs against an empty tree.
+fn get_staged_files(repo: &git2::Repository) -> Vec<String> {
+    let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
+
+    let mut diff_opts = git2::DiffOptions::new();
+    diff_opts.include_untracked(false);
+
+    let diff = match repo.diff_tree_to_index(
+        head_tree.as_ref(),
+        None, // None = use repo's index
+        Some(&mut diff_opts),
+    ) {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut files: Vec<String> = Vec::new();
+    let _ = diff.foreach(
+        &mut |delta: git2::DiffDelta<'_>, _| {
+            // Use new_file path (handles renames correctly)
+            if let Some(path) = delta.new_file().path() {
+                files.push(path.to_string_lossy().into_owned());
+            }
+            true
+        },
+        None,
+        None,
+        None,
+    );
+
+    files.sort();
+    files
 }
 
 fn get_repo_name(repo: &git2::Repository) -> String {
@@ -152,11 +195,9 @@ mod tests {
 
     #[test]
     fn https_url_no_path_segment() {
-        // Edge case: bare domain — should return None or the domain
-        let result = parse_repo_name_from_url("https://github.com/");
-        // After trim_end_matches('/') → "https://github.com", split('/').last() → "github.com"
+        // After trim_end_matches('/') → "https://github.com", split('/').next_back() → "github.com"
         // Not empty, so Some("github.com") — acceptable fallback
-        assert!(result.is_some());
+        assert!(parse_repo_name_from_url("https://github.com/").is_some());
     }
 
     #[test]

@@ -19,12 +19,22 @@ fn bin() -> std::path::PathBuf {
 /// Run `nota <args>` with a dedicated temp notes directory.
 /// Returns (stdout, stderr, exit_status).
 fn run(dir: &Path, args: &[&str]) -> (String, String, std::process::ExitStatus) {
+    run_in(dir, dir, args)
+}
+
+/// Run `nota <args>` from a specific working directory, storing notes in `notes_dir`.
+fn run_in(
+    notes_dir: &Path,
+    workdir: &Path,
+    args: &[&str],
+) -> (String, String, std::process::ExitStatus) {
     let out = Command::new(bin())
         .args(args)
-        .env("NOTA_NOTES_DIR", dir)
-        // Disable git discovery so tests are repo-agnostic
+        .env("NOTA_NOTES_DIR", notes_dir)
+        // Disable git discovery for most tests; git-context tests override this
         .env("GIT_DIR", "")
         .env("GIT_CEILING_DIRECTORIES", "/")
+        .current_dir(workdir)
         .output()
         .expect("failed to run nota binary");
 
@@ -322,4 +332,162 @@ fn delete_nonexistent_exits_nonzero() {
     let (_, stderr, status) = run(dir.path(), &["delete", "deadbeef"]);
     assert!(!status.success());
     assert!(stderr.contains("not found"), "stderr: {}", stderr);
+}
+
+// ── changed_files (staged git files) ─────────────────────────────────────────
+
+/// Helper: run nota without suppressing git discovery (for git-context tests).
+fn run_git(
+    notes_dir: &Path,
+    workdir: &Path,
+    args: &[&str],
+) -> (String, String, std::process::ExitStatus) {
+    let out = Command::new(bin())
+        .args(args)
+        .env("NOTA_NOTES_DIR", notes_dir)
+        // Do NOT set GIT_DIR or GIT_CEILING_DIRECTORIES — allow real git discovery
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_CEILING_DIRECTORIES")
+        .current_dir(workdir)
+        .output()
+        .expect("failed to run nota binary");
+
+    (
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+        out.status,
+    )
+}
+
+#[test]
+fn show_displays_staged_files() {
+    // Set up a temporary git repository
+    let repo_dir = tmpdir();
+    let notes_dir = tmpdir();
+
+    // Initialise git repo
+    Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(repo_dir.path())
+        .output()
+        .expect("git init failed");
+
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    // Create and stage a file
+    std::fs::write(repo_dir.path().join("hello.rs"), "fn main() {}").unwrap();
+    Command::new("git")
+        .args(["add", "hello.rs"])
+        .current_dir(repo_dir.path())
+        .output()
+        .expect("git add failed");
+
+    // Add a nota note from inside the repo
+    let (out, _, status) = run_git(
+        notes_dir.path(),
+        repo_dir.path(),
+        &["add", "staged file test"],
+    );
+    assert!(status.success(), "nota add failed: {}", out);
+    let id = out
+        .trim()
+        .split_whitespace()
+        .nth(2)
+        .unwrap()
+        .trim_end_matches('.');
+
+    // nota show should include the staged file
+    let (stdout, _, status) = run_git(notes_dir.path(), repo_dir.path(), &["show", id]);
+    assert!(status.success());
+    assert!(
+        stdout.contains("hello.rs"),
+        "expected 'hello.rs' in show output, got:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("staged files"),
+        "expected 'staged files' header in show output, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn show_no_staged_files_shows_no_section() {
+    // When there are no staged files the "staged files" section should be absent
+    let notes_dir = tmpdir();
+
+    // Use a non-git directory (git suppressed via env vars in run())
+    let (out, _, _) = run(notes_dir.path(), &["add", "note without any git staging"]);
+    let id = out
+        .trim()
+        .split_whitespace()
+        .nth(2)
+        .unwrap()
+        .trim_end_matches('.');
+
+    let (stdout, _, status) = run(notes_dir.path(), &["show", id]);
+    assert!(status.success());
+    assert!(
+        !stdout.contains("staged files"),
+        "should not show staged files section, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn frontmatter_contains_changed_files_field() {
+    // Verify the .md file itself records changed_files when files are staged
+    let repo_dir = tmpdir();
+    let notes_dir = tmpdir();
+
+    Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    std::fs::write(repo_dir.path().join("lib.rs"), "pub fn foo() {}").unwrap();
+    Command::new("git")
+        .args(["add", "lib.rs"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    run_git(
+        notes_dir.path(),
+        repo_dir.path(),
+        &["add", "frontmatter files test"],
+    );
+
+    let file = std::fs::read_dir(notes_dir.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
+        .expect("no note file found");
+
+    let content = std::fs::read_to_string(file.path()).unwrap();
+    assert!(
+        content.contains("changed_files") && content.contains("lib.rs"),
+        "expected changed_files in frontmatter, got:\n{}",
+        content
+    );
 }

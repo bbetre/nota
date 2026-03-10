@@ -15,6 +15,10 @@ pub struct NoteFrontmatter {
     /// Optional freeform tags. Absent in old notes — defaults to empty vec.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// Staged git files at the time the note was saved (relative to repo root).
+    /// Absent in old notes — defaults to empty vec.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changed_files: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -249,6 +253,7 @@ mod tests {
                 git_repo: "myrepo".to_string(),
                 git_branch: "main".to_string(),
                 tags: vec!["rust".to_string(), "test".to_string()],
+                changed_files: vec!["src/main.rs".to_string(), "src/lib.rs".to_string()],
             },
             body: "Round-trip test body.".to_string(),
             file_path: dir.path().join("deadbeef.md"),
@@ -262,6 +267,10 @@ mod tests {
 
         assert_eq!(parsed.frontmatter.id, "deadbeef");
         assert_eq!(parsed.frontmatter.tags, vec!["rust", "test"]);
+        assert_eq!(
+            parsed.frontmatter.changed_files,
+            vec!["src/main.rs", "src/lib.rs"]
+        );
         assert_eq!(parsed.body, "Round-trip test body.");
 
         std::env::remove_var("NOTA_NOTES_DIR");

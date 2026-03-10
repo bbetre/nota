@@ -205,6 +205,7 @@ fn cmd_add(text: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
             git_repo: ctx.git_repo,
             git_branch: ctx.git_branch,
             tags: Vec::new(),
+            changed_files: ctx.changed_files,
         },
         body,
         file_path: note::notes_dir().join(format!("{}.md", id)),
@@ -256,6 +257,7 @@ fn cmd_show(id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let n = note::load_note_by_id(id)?;
     // print! not println! — body already has a trailing newline from write_note
     print!("{}", n.body);
+    display::print_changed_files(&n.frontmatter.changed_files);
     Ok(())
 }
 
