@@ -19,6 +19,14 @@ pub struct NoteFrontmatter {
     /// Absent in old notes — defaults to empty vec.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub changed_files: Vec<String>,
+    /// Unstaged modified files at the time the note was saved (relative to repo root).
+    /// Absent in old notes — defaults to empty vec.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unstaged_files: Vec<String>,
+    /// Untracked files (new, never git add'd) at the time the note was saved.
+    /// Absent in old notes — defaults to empty vec.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub untracked_files: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -254,6 +262,8 @@ mod tests {
                 git_branch: "main".to_string(),
                 tags: vec!["rust".to_string(), "test".to_string()],
                 changed_files: vec!["src/main.rs".to_string(), "src/lib.rs".to_string()],
+                unstaged_files: vec!["README.md".to_string()],
+                untracked_files: vec!["new_file.rs".to_string()],
             },
             body: "Round-trip test body.".to_string(),
             file_path: dir.path().join("deadbeef.md"),
@@ -271,6 +281,8 @@ mod tests {
             parsed.frontmatter.changed_files,
             vec!["src/main.rs", "src/lib.rs"]
         );
+        assert_eq!(parsed.frontmatter.unstaged_files, vec!["README.md"]);
+        assert_eq!(parsed.frontmatter.untracked_files, vec!["new_file.rs"]);
         assert_eq!(parsed.body, "Round-trip test body.");
 
         std::env::remove_var("NOTA_NOTES_DIR");

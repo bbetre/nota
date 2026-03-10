@@ -414,8 +414,8 @@ fn show_displays_staged_files() {
         stdout
     );
     assert!(
-        stdout.contains("staged files"),
-        "expected 'staged files' header in show output, got:\n{}",
+        stdout.contains("── staged "),
+        "expected 'staged' header in show output, got:\n{}",
         stdout
     );
 }

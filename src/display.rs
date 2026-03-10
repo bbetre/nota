@@ -138,13 +138,27 @@ pub fn print_log_table(groups: &[RepoGroup], _config: &DisplayConfig) {
     }
 }
 
-pub fn print_changed_files(files: &[String]) {
-    if files.is_empty() {
+pub fn print_changed_files(staged: &[String], unstaged: &[String], untracked: &[String]) {
+    if staged.is_empty() && unstaged.is_empty() && untracked.is_empty() {
         return;
     }
-    println!("\n{}", "── staged files ─────────────────────".dimmed());
-    for f in files {
-        println!("  {}", f.dimmed());
+    if !staged.is_empty() {
+        println!("\n{}", "── staged ────────────────────────────".dimmed());
+        for f in staged {
+            println!("  {}", f.dimmed());
+        }
+    }
+    if !unstaged.is_empty() {
+        println!("\n{}", "── unstaged ──────────────────────────".dimmed());
+        for f in unstaged {
+            println!("  {}", f.dimmed());
+        }
+    }
+    if !untracked.is_empty() {
+        println!("\n{}", "── untracked ─────────────────────────".dimmed());
+        for f in untracked {
+            println!("  {}", f.dimmed());
+        }
     }
 }
 

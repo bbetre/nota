@@ -206,6 +206,8 @@ fn cmd_add(text: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
             git_branch: ctx.git_branch,
             tags: Vec::new(),
             changed_files: ctx.changed_files,
+            unstaged_files: ctx.unstaged_files,
+            untracked_files: ctx.untracked_files,
         },
         body,
         file_path: note::notes_dir().join(format!("{}.md", id)),
@@ -255,9 +257,12 @@ fn cmd_list(
 
 fn cmd_show(id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let n = note::load_note_by_id(id)?;
-    // print! not println! — body already has a trailing newline from write_note
     print!("{}", n.body);
-    display::print_changed_files(&n.frontmatter.changed_files);
+    display::print_changed_files(
+        &n.frontmatter.changed_files,
+        &n.frontmatter.unstaged_files,
+        &n.frontmatter.untracked_files,
+    );
     Ok(())
 }
 

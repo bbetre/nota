@@ -8,9 +8,12 @@ pub struct NoteContext {
     pub directory: String,
     pub git_repo: String,
     pub git_branch: String,
-    /// Paths of staged files relative to the repo root. Empty outside git repos
-    /// or when nothing is staged.
+    /// Staged files (index vs HEAD). Empty outside git repos or when nothing is staged.
     pub changed_files: Vec<String>,
+    /// Tracked files modified in the working tree but not staged (index vs workdir).
+    pub unstaged_files: Vec<String>,
+    /// New files not yet known to git (untracked).
+    pub untracked_files: Vec<String>,
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -24,8 +27,16 @@ pub fn capture_context() -> NoteContext {
 
     let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
 
-    let (git_repo, git_branch, changed_files) = capture_git_context(&directory)
-        .unwrap_or_else(|_| ("none".to_string(), "none".to_string(), Vec::new()));
+    let (git_repo, git_branch, changed_files, unstaged_files, untracked_files) =
+        capture_git_context(&directory).unwrap_or_else(|_| {
+            (
+                "none".to_string(),
+                "none".to_string(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            )
+        });
 
     NoteContext {
         timestamp,
@@ -33,17 +44,24 @@ pub fn capture_context() -> NoteContext {
         git_repo,
         git_branch,
         changed_files,
+        unstaged_files,
+        untracked_files,
     }
 }
 
 // ── Git context ───────────────────────────────────────────────────────────────
 
-fn capture_git_context(dir: &str) -> Result<(String, String, Vec<String>), git2::Error> {
+/// (repo_name, branch, staged_files, unstaged_files, untracked_files)
+type GitContext = (String, String, Vec<String>, Vec<String>, Vec<String>);
+
+fn capture_git_context(dir: &str) -> Result<GitContext, git2::Error> {
     let repo = git2::Repository::discover(dir)?;
     let branch = get_branch(&repo);
     let repo_name = get_repo_name(&repo);
     let staged = get_staged_files(&repo);
-    Ok((repo_name, branch, staged))
+    let unstaged = get_unstaged_files(&repo);
+    let untracked = get_untracked_files(&repo);
+    Ok((repo_name, branch, staged, unstaged, untracked))
 }
 
 fn get_branch(repo: &git2::Repository) -> String {
@@ -79,6 +97,67 @@ fn get_staged_files(repo: &git2::Repository) -> Vec<String> {
             // Use new_file path (handles renames correctly)
             if let Some(path) = delta.new_file().path() {
                 files.push(path.to_string_lossy().into_owned());
+            }
+            true
+        },
+        None,
+        None,
+        None,
+    );
+
+    files.sort();
+    files
+}
+
+/// Returns paths of modified/deleted files in the working tree that are NOT staged
+/// (equivalent to `git diff --name-only`): compares the index against the working directory.
+fn get_unstaged_files(repo: &git2::Repository) -> Vec<String> {
+    let mut diff_opts = git2::DiffOptions::new();
+    diff_opts.include_untracked(false);
+
+    let diff = match repo.diff_index_to_workdir(None, Some(&mut diff_opts)) {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut files: Vec<String> = Vec::new();
+    let _ = diff.foreach(
+        &mut |delta: git2::DiffDelta<'_>, _| {
+            if let Some(path) = delta.new_file().path() {
+                files.push(path.to_string_lossy().into_owned());
+            }
+            true
+        },
+        None,
+        None,
+        None,
+    );
+
+    files.sort();
+    files
+}
+
+/// Returns paths of files git does not know about at all (untracked).
+/// Equivalent to the "Untracked files" section of `git status`.
+fn get_untracked_files(repo: &git2::Repository) -> Vec<String> {
+    let mut diff_opts = git2::DiffOptions::new();
+    diff_opts.include_untracked(true);
+    diff_opts.recurse_untracked_dirs(true);
+
+    // diff_index_to_workdir with include_untracked gives us both modified and
+    // untracked deltas. Filter to only UNTRACKED status.
+    let diff = match repo.diff_index_to_workdir(None, Some(&mut diff_opts)) {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut files: Vec<String> = Vec::new();
+    let _ = diff.foreach(
+        &mut |delta: git2::DiffDelta<'_>, _| {
+            if delta.status() == git2::Delta::Untracked {
+                if let Some(path) = delta.new_file().path() {
+                    files.push(path.to_string_lossy().into_owned());
+                }
             }
             true
         },
