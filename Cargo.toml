@@ -2,6 +2,14 @@
 name = "nota"
 version = "0.1.0"
 edition = "2021"
+description = "A fast, zero-friction CLI note-taker that captures git context (repo, branch, staged files) automatically with every note."
+authors = ["bbetre"]
+license = "MIT"
+repository = "https://github.com/bbetre/nota"
+homepage = "https://github.com/bbetre/nota"
+readme = "README.md"
+keywords = ["cli", "notes", "git", "productivity", "terminal"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "nota"
