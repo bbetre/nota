@@ -10,9 +10,12 @@ Notes are plain Markdown files stored in `~/.notes/`. No database, no daemon, no
 
 ## Features
 
-- **Context capture** — Records git repo, branch, directory, and timestamp automatically on every `nota add`
+- **Context capture** — Records git repo, branch, directory, commit, and timestamp automatically on every `nota add`
 - **Staged file tracking** — Captures which files you had staged in git at the time of writing
+- **Commit linking** — Find notes by the commit they were created in; see commit info in `nota show`
 - **Tags** — Add freeform tags to any note; filter by tag in `list` and `search`
+- **Search** — Full-text search with `--fuzzy` flag for typo-tolerant, flexible matching
+- **Interactive TUI** — `nota tui` for keyboard-driven browsing, searching, and tagging
 - **Stats** — See note counts by day/week/month and your most active repo
 - **Shell completions** — Bash, Zsh, and Fish supported via `nota completions`
 - **Plain text** — Every note is a readable Markdown file; open, edit, or grep them directly
@@ -46,6 +49,12 @@ nota context
 
 # Search across all notes
 nota search "N+1"
+
+# Fuzzy search for typo tolerance
+nota search "databse" --fuzzy     # Finds "database" despite typo
+
+# View notes from a specific commit
+nota commits abc1234    # Find all notes from this commit
 
 # Add tags to a note
 nota tag add a3f9c1bd performance database
@@ -106,7 +115,7 @@ nota list --tag bug
 
 ### `nota show ID`
 
-Print a note's full body to stdout. Also displays staged files if any were captured.
+Print a note's full body to stdout. Also displays staged files and commit info if available.
 
 ```bash
 nota show a3f9c1bd
@@ -115,7 +124,8 @@ nota show a3f9c1bd
 ```
 Fix the N+1 query in users endpoint before deploy
 
-── staged files ──────────────────────────────────
+── commit a7f3c2d1
+── staged ────────────────────────────
   src/db/users.rs
   src/handlers/users.rs
 ```
@@ -124,23 +134,77 @@ Output is pipe-friendly (no ANSI color when piped).
 
 ---
 
+### `nota commits HASH`
+
+List all notes created during a specific commit.
+
+```bash
+nota commits a7f3c2d1      # Full or short commit hash
+nota commits a7f3c2d       # Short hash (7+ chars)
+```
+
+Useful for finding all the notes you wrote while working on a particular commit, or for linking development context with commit history.
+
+---
+
 ### `nota search QUERY`
 
 Full-text search across all note bodies, with matches highlighted.
 
 ```
-nota search QUERY [--here] [--tag TAG]
+nota search QUERY [--here] [--tag TAG] [--fuzzy]
 ```
 
 | Flag | Description |
 |---|---|
 | `--here` | Scope search to current repo and directory |
 | `--tag TAG` | Filter results to notes with this tag |
+| `--fuzzy` | Use fuzzy matching for typo-tolerant search |
 
 ```bash
 nota search "migration"
 nota search "deploy" --here
 nota search "timeout" --tag backend
+nota search "detabase" --fuzzy    # Finds "database" despite typo
+nota search "DB" --fuzzy --tag backend  # Fuzzy + filters combined
+```
+
+**Fuzzy vs. exact search:** By default, `nota search` uses case-insensitive substring matching. With `--fuzzy`, it uses flexible matching that tolerates typos, skipped characters, and word order changes. Results are ranked by match quality (best matches first). Useful when you're not sure of exact spelling or phrasing.
+
+---
+
+### `nota tui`
+
+Launch an interactive terminal user interface for browsing and managing notes with keyboard control.
+
+```bash
+nota tui
+```
+
+**Keybindings in TUI mode:**
+
+| Key | Action |
+|---|---|
+| `j` / `↓` | Move down one note |
+| `k` / `↑` | Move up one note |
+| `Home` / `End` | Jump to first/last note |
+| `/` | Enter search mode (filter notes by query) |
+| `Enter` | Exit search mode (confirm filter) |
+| `Esc` | Cancel search/exit tag input/exit TUI |
+| `t` | Enter tag input mode (add tags) |
+| `Space` | Accept tag when in tag input mode |
+| `q` | Quit TUI |
+
+The TUI displays notes in a two-pane layout:
+- **Left pane** — List of notes, most recent first
+- **Right pane** — Full preview of selected note, including metadata and body
+
+Search mode filters the note list in real-time. Tag input mode allows you to add space-separated tags to the selected note. The help text at the bottom updates to show available actions in your current mode.
+
+```bash
+nota tui
+# → Opens interactive terminal with all your notes
+# → Press 'j'/'k' to navigate, '/' to search, 't' to tag, 'q' to quit
 ```
 
 ---
