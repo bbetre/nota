@@ -8,6 +8,8 @@ pub struct NoteContext {
     pub directory: String,
     pub git_repo: String,
     pub git_branch: String,
+    /// Current commit hash (40-char SHA-1) or "none" if not in a git repo or detached.
+    pub commit_hash: String,
     /// Staged files (index vs HEAD). Empty outside git repos or when nothing is staged.
     pub changed_files: Vec<String>,
     /// Tracked files modified in the working tree but not staged (index vs workdir).
@@ -27,9 +29,10 @@ pub fn capture_context() -> NoteContext {
 
     let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
 
-    let (git_repo, git_branch, changed_files, unstaged_files, untracked_files) =
+    let (git_repo, git_branch, commit_hash, changed_files, unstaged_files, untracked_files) =
         capture_git_context(&directory).unwrap_or_else(|_| {
             (
+                "none".to_string(),
                 "none".to_string(),
                 "none".to_string(),
                 Vec::new(),
@@ -43,6 +46,7 @@ pub fn capture_context() -> NoteContext {
         directory,
         git_repo,
         git_branch,
+        commit_hash,
         changed_files,
         unstaged_files,
         untracked_files,
@@ -51,23 +55,35 @@ pub fn capture_context() -> NoteContext {
 
 // ── Git context ───────────────────────────────────────────────────────────────
 
-/// (repo_name, branch, staged_files, unstaged_files, untracked_files)
-type GitContext = (String, String, Vec<String>, Vec<String>, Vec<String>);
+/// (repo_name, branch, commit_hash, staged_files, unstaged_files, untracked_files)
+type GitContext = (String, String, String, Vec<String>, Vec<String>, Vec<String>);
 
 fn capture_git_context(dir: &str) -> Result<GitContext, git2::Error> {
     let repo = git2::Repository::discover(dir)?;
     let branch = get_branch(&repo);
     let repo_name = get_repo_name(&repo);
+    let commit_hash = get_commit_hash(&repo);
     let staged = get_staged_files(&repo);
     let unstaged = get_unstaged_files(&repo);
     let untracked = get_untracked_files(&repo);
-    Ok((repo_name, branch, staged, unstaged, untracked))
+    Ok((repo_name, branch, commit_hash, staged, unstaged, untracked))
 }
 
 fn get_branch(repo: &git2::Repository) -> String {
     match repo.head() {
         Ok(head) if head.is_branch() => head.shorthand().unwrap_or("none").to_string(),
         _ => "none".to_string(), // detached HEAD or error
+    }
+}
+
+/// Returns the current HEAD commit as a 40-char hex SHA-1, or "none" if repo is empty/error.
+fn get_commit_hash(repo: &git2::Repository) -> String {
+    match repo.head() {
+        Ok(head) => match head.peel_to_commit() {
+            Ok(commit) => commit.id().to_string(),
+            Err(_) => "none".to_string(), // Empty repo (no commits yet)
+        },
+        Err(_) => "none".to_string(), // Detached HEAD or other error
     }
 }
 
