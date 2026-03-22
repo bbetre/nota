@@ -2,6 +2,7 @@ mod context;
 mod display;
 mod note;
 mod search;
+mod tui;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
@@ -64,6 +65,9 @@ enum Commands {
         /// Filter results by tag
         #[arg(long)]
         tag: Option<String>,
+        /// Use fuzzy matching for typo-tolerant search
+        #[arg(long)]
+        fuzzy: bool,
     },
 
     /// Show notes from current repo and directory
@@ -101,6 +105,15 @@ enum Commands {
 
     /// Show stats about your notes
     Stats,
+
+    /// List notes from a specific commit
+    Commits {
+        /// Commit hash (full or short hash)
+        hash: String,
+    },
+
+    /// Interactive TUI for browsing and managing notes
+    Tui,
 
     /// Print shell completion script to stdout
     ///
@@ -161,13 +174,15 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             tag,
         } => cmd_list(limit, here, repo, branch, tag),
         Commands::Show { id } => cmd_show(&id),
-        Commands::Search { query, here, tag } => cmd_search(&query, here, tag),
+        Commands::Search { query, here, tag, fuzzy } => cmd_search(&query, here, tag, fuzzy),
         Commands::Context { repo, branch } => cmd_context(repo, branch),
         Commands::Log { days } => cmd_log(days),
         Commands::Delete { id } => cmd_delete(&id),
         Commands::Edit { id } => cmd_edit(&id),
         Commands::Tag(sub) => cmd_tag(sub),
         Commands::Stats => cmd_stats(),
+        Commands::Commits { hash } => cmd_commits(&hash),
+        Commands::Tui => cmd_tui(),
         Commands::Completions { shell } => cmd_completions(shell),
     }
 }
@@ -204,6 +219,7 @@ fn cmd_add(text: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
             directory: ctx.directory,
             git_repo: ctx.git_repo,
             git_branch: ctx.git_branch,
+            commit_hash: ctx.commit_hash,
             tags: Vec::new(),
             changed_files: ctx.changed_files,
             unstaged_files: ctx.unstaged_files,
@@ -258,6 +274,7 @@ fn cmd_list(
 fn cmd_show(id: &str) -> Result<(), Box<dyn std::error::Error>> {
     let n = note::load_note_by_id(id)?;
     print!("{}", n.body);
+    display::print_commit_info(&n.frontmatter.commit_hash);
     display::print_changed_files(
         &n.frontmatter.changed_files,
         &n.frontmatter.unstaged_files,
@@ -270,6 +287,7 @@ fn cmd_search(
     query: &str,
     here: bool,
     tag: Option<String>,
+    fuzzy: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ctx = if here {
         Some(context::capture_context())
@@ -287,7 +305,7 @@ fn cmd_search(
 
     let mut notes = search::load_all_notes(&note::notes_dir());
     search::sort_by_recency(&mut notes);
-    let notes = search::search_notes(notes, query);
+    let notes = search::search_notes(notes, query, fuzzy);
     let notes = search::apply_filters(notes, &opts);
 
     let config = display::DisplayConfig::default();
@@ -425,6 +443,33 @@ fn cmd_stats() -> Result<(), Box<dyn std::error::Error>> {
     let config = display::DisplayConfig::default();
     display::print_stats(&stats);
     let _ = config; // DisplayConfig reserved for future use
+    Ok(())
+}
+
+fn cmd_commits(hash: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut notes = search::load_all_notes(&note::notes_dir());
+    
+    // Filter notes by commit hash (match full or short hash)
+    notes.retain(|n| {
+        n.frontmatter.commit_hash.starts_with(hash)
+            || hash.starts_with(&n.frontmatter.commit_hash[..8.min(n.frontmatter.commit_hash.len())])
+    });
+
+    if notes.is_empty() {
+        eprintln!("No notes found for commit '{}'.", hash);
+        return Ok(());
+    }
+
+    search::sort_by_recency(&mut notes);
+    let config = display::DisplayConfig::default();
+    display::print_notes_table(&notes, &config);
+    Ok(())
+}
+
+fn cmd_tui() -> Result<(), Box<dyn std::error::Error>> {
+    let mut notes = search::load_all_notes(&note::notes_dir());
+    search::sort_by_recency(&mut notes);
+    tui::run_tui(notes)?;
     Ok(())
 }
 
