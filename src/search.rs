@@ -152,22 +152,29 @@ pub fn apply_filters(notes: Vec<Note>, opts: &FilterOptions) -> Vec<Note> {
 
 /// Search notes using either exact substring or fuzzy matching.
 /// When fuzzy=true, uses SkimMatcher for typo-tolerant, flexible search.
-/// When fuzzy=false, uses case-insensitive substring matching.
-pub fn search_notes(notes: Vec<Note>, query: &str, fuzzy: bool) -> Vec<Note> {
+/// When fuzzy=false, uses substring matching (case-sensitive or insensitive based on case_sensitive).
+pub fn search_notes(notes: Vec<Note>, query: &str, fuzzy: bool, case_sensitive: bool) -> Vec<Note> {
     if fuzzy {
         search_notes_fuzzy(notes, query)
     } else {
-        search_notes_exact(notes, query)
+        search_notes_exact(notes, query, case_sensitive)
     }
 }
 
-/// Exact case-insensitive substring search
-fn search_notes_exact(notes: Vec<Note>, query: &str) -> Vec<Note> {
-    let query_lower = query.to_lowercase();
-    notes
-        .into_iter()
-        .filter(|n| n.body.to_lowercase().contains(&query_lower))
-        .collect()
+/// Exact substring search
+fn search_notes_exact(notes: Vec<Note>, query: &str, case_sensitive: bool) -> Vec<Note> {
+    if case_sensitive {
+        notes
+            .into_iter()
+            .filter(|n| n.body.contains(query))
+            .collect()
+    } else {
+        let query_lower = query.to_lowercase();
+        notes
+            .into_iter()
+            .filter(|n| n.body.to_lowercase().contains(&query_lower))
+            .collect()
+    }
 }
 
 /// Fuzzy match search using Skim's matcher algorithm.

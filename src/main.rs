@@ -310,7 +310,7 @@ fn cmd_search(
 
     let mut notes = search::load_all_notes(&note::notes_dir());
     search::sort_by_recency(&mut notes);
-    let notes = search::search_notes(notes, query, fuzzy);
+    let notes = search::search_notes(notes, query, fuzzy, false);
     let notes = search::apply_filters(notes, &opts);
 
     let config = display::DisplayConfig::default();
