@@ -23,13 +23,21 @@ Notes are plain Markdown files stored in `~/.notes/`. No database, no daemon, no
 
 ---
 graph TD
-    A[AI Coding Agents] --> B[InsForge Semantic Layer]
-    B --> C[Authentication]
-    B --> D[Database]
-    B --> E[Storage]
-    B --> F[Edge Functions]
-    B --> G[Model Gateway]
-    B --> H[Policy]
+    User([User]) -- "nota add 'message'" --> CLI[nota CLI]
+    
+    subgraph Context [Auto-Context Capture]
+        CLI --> Git[git2-rs]
+        Git --> Repo[Repo & Branch]
+        Git --> Staged[Staged Files]
+        CLI --> FS[Working Directory]
+    end
+    
+    Context --> Processor{Metadata Processor}
+    Processor --> Markdown[Markdown + YAML Frontmatter]
+    Markdown --> Storage[(~/.notes/ID.md)]
+    
+    style Storage fill:#2d333b,stroke:#58a6ff,color:#adbac7
+    style CLI fill:#f74c00,stroke:#fff,color:#fff
 ---
 
 ## Install
