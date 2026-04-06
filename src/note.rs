@@ -268,6 +268,7 @@ mod tests {
                 directory: "/tmp".to_string(),
                 git_repo: "myrepo".to_string(),
                 git_branch: "main".to_string(),
+                commit_hash: "none".to_string(),
                 tags: vec!["rust".to_string(), "test".to_string()],
                 changed_files: vec!["src/main.rs".to_string(), "src/lib.rs".to_string()],
                 unstaged_files: vec!["README.md".to_string()],
