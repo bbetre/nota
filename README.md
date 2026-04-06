@@ -22,22 +22,28 @@ Notes are plain Markdown files stored in `~/.notes/`. No database, no daemon, no
 - **Zero friction** — `nota add "your note"` is all it takes
 
 ---
-graph TD
-    User([User]) -- "nota add 'message'" --> CLI[nota CLI]
-    
-    subgraph Context [Auto-Context Capture]
-        CLI --> Git[git2-rs]
-        Git --> Repo[Repo & Branch]
-        Git --> Staged[Staged Files]
-        CLI --> FS[Working Directory]
+graph LR
+    subgraph Input
+        A[CLI Args] --> Main[main.rs]
+        B[Stdin] --> Main
     end
-    
-    Context --> Processor{Metadata Processor}
-    Processor --> Markdown[Markdown + YAML Frontmatter]
-    Markdown --> Storage[(~/.notes/ID.md)]
-    
-    style Storage fill:#2d333b,stroke:#58a6ff,color:#adbac7
-    style CLI fill:#f74c00,stroke:#fff,color:#fff
+
+    subgraph Core_Logic [Core Logic]
+        Main --> Context[context.rs]
+        Main --> Note[note.rs]
+        Main --> Search[search.rs]
+    end
+
+    subgraph External
+        Context --> Git[(Local Git)]
+        Note --> Filesystem[(~/.notes/*.md)]
+    end
+
+    Search --> Display[display.rs]
+    Display --> TUI[Terminal / TUI]
+
+    style Main fill:#f74c00,stroke:#fff,color:#fff
+    style Core_Logic fill:#1c1c1c,stroke:#30363d
 ---
 
 ## Install
