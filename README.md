@@ -22,6 +22,15 @@ Notes are plain Markdown files stored in `~/.notes/`. No database, no daemon, no
 - **Zero friction** — `nota add "your note"` is all it takes
 
 ---
+graph TD
+    A[AI Coding Agents] --> B[InsForge Semantic Layer]
+    B --> C[Authentication]
+    B --> D[Database]
+    B --> E[Storage]
+    B --> F[Edge Functions]
+    B --> G[Model Gateway]
+    B --> H[Policy]
+---
 
 ## Install
 
