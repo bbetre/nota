@@ -56,7 +56,14 @@ pub fn capture_context() -> NoteContext {
 // ── Git context ───────────────────────────────────────────────────────────────
 
 /// (repo_name, branch, commit_hash, staged_files, unstaged_files, untracked_files)
-type GitContext = (String, String, String, Vec<String>, Vec<String>, Vec<String>);
+type GitContext = (
+    String,
+    String,
+    String,
+    Vec<String>,
+    Vec<String>,
+    Vec<String>,
+);
 
 fn capture_git_context(dir: &str) -> Result<GitContext, git2::Error> {
     let repo = git2::Repository::discover(dir)?;

@@ -499,7 +499,7 @@ fn search_exact_finds_exact_match() {
     let dir = tmpdir();
     run(dir.path(), &["add", "debugging the auth flow"]);
     run(dir.path(), &["add", "authentication in progress"]);
-    
+
     let (stdout, _, status) = run(dir.path(), &["search", "auth"]);
     assert!(status.success());
     // Both notes contain "auth" substring
@@ -511,7 +511,7 @@ fn search_fuzzy_finds_typo_tolerant_match() {
     let dir = tmpdir();
     run(dir.path(), &["add", "debugging database performance"]);
     run(dir.path(), &["add", "unrelated note"]);
-    
+
     // Search with typo: "datbase" instead of "database"
     let (stdout, _, status) = run(dir.path(), &["search", "datbase", "--fuzzy"]);
     assert!(status.success());
@@ -528,13 +528,13 @@ fn search_fuzzy_vs_exact_behavior() {
     let dir = tmpdir();
     run(dir.path(), &["add", "the quick brown fox"]);
     run(dir.path(), &["add", "slower animals run"]);
-    
+
     // Exact search for "qck" should find nothing (no output)
     let (exact_out, _, _) = run(dir.path(), &["search", "qck"]);
-    
-    // Fuzzy search for "qck" should find "quick" 
+
+    // Fuzzy search for "qck" should find "quick"
     let (fuzzy_out, _, _) = run(dir.path(), &["search", "qck", "--fuzzy"]);
-    
+
     // The fuzzy output should be longer/contain more than exact output when fuzzy succeeds
     assert!(
         fuzzy_out.len() > exact_out.len(),
@@ -546,7 +546,7 @@ fn search_fuzzy_vs_exact_behavior() {
 fn search_fuzzy_empty_result() {
     let dir = tmpdir();
     run(dir.path(), &["add", "hello world"]);
-    
+
     // Search for something completely unrelated with fuzzy
     let (stdout, stderr, status) = run(dir.path(), &["search", "zzzzz", "--fuzzy"]);
     assert!(status.success());
@@ -564,7 +564,7 @@ fn search_fuzzy_with_filters() {
     let dir = tmpdir();
     run(dir.path(), &["add", "performance tuning"]);
     run(dir.path(), &["add", "another task"]);
-    
+
     // Fuzzy search combined with tag filter (should still work)
     let (stdout, _, status) = run(dir.path(), &["search", "perf", "--fuzzy"]);
     assert!(status.success());
@@ -692,7 +692,11 @@ fn commits_command_filters_notes() {
     let hash1 = String::from_utf8_lossy(&commit1.stdout).trim().to_string();
 
     // Create a note for this commit
-    run_git(notes_dir.path(), repo_dir.path(), &["add", "note in commit 1"]);
+    run_git(
+        notes_dir.path(),
+        repo_dir.path(),
+        &["add", "note in commit 1"],
+    );
 
     // Make a second commit
     std::fs::write(repo_dir.path().join("file2.txt"), "v2").unwrap();
@@ -717,7 +721,11 @@ fn commits_command_filters_notes() {
     let _hash2 = String::from_utf8_lossy(&commit2.stdout).trim().to_string();
 
     // Create a note for this commit
-    run_git(notes_dir.path(), repo_dir.path(), &["add", "note in commit 2"]);
+    run_git(
+        notes_dir.path(),
+        repo_dir.path(),
+        &["add", "note in commit 2"],
+    );
 
     // List notes from commit 1 using short hash
     let (stdout, _, status) = run_git(notes_dir.path(), repo_dir.path(), &["commits", &hash1[..8]]);
@@ -733,4 +741,3 @@ fn commits_command_filters_notes() {
         stdout
     );
 }
-

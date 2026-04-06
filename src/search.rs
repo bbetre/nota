@@ -1,7 +1,7 @@
 use crate::note::{self, Note};
 use chrono::{Datelike, Duration};
-use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -178,11 +178,7 @@ fn search_notes_fuzzy(notes: Vec<Note>, query: &str) -> Vec<Note> {
     // Filter notes that have a fuzzy match, and assign scores
     let mut scored: Vec<(Note, i64)> = notes
         .into_iter()
-        .filter_map(|n| {
-            matcher
-                .fuzzy_match(&n.body, query)
-                .map(|score| (n, score))
-        })
+        .filter_map(|n| matcher.fuzzy_match(&n.body, query).map(|score| (n, score)))
         .collect();
 
     // Sort by score descending (better matches first)
