@@ -12,6 +12,10 @@ pub struct NoteFrontmatter {
     pub directory: String,
     pub git_repo: String,
     pub git_branch: String,
+    /// Current commit hash (40-char SHA-1) at the time the note was saved.
+    /// Absent in old notes — defaults to "none".
+    #[serde(default = "default_none")]
+    pub commit_hash: String,
     /// Optional freeform tags. Absent in old notes — defaults to empty vec.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
@@ -27,6 +31,10 @@ pub struct NoteFrontmatter {
     /// Absent in old notes — defaults to empty vec.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub untracked_files: Vec<String>,
+}
+
+fn default_none() -> String {
+    "none".to_string()
 }
 
 #[derive(Debug, Clone)]

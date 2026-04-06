@@ -1,5 +1,7 @@
 use crate::note::{self, Note};
 use chrono::{Datelike, Duration};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -13,6 +15,12 @@ pub struct FilterOptions {
     pub tag: Option<String>,
     pub current_dir: Option<String>,
     pub current_repo: Option<String>,
+}
+
+/// Search options for note queries
+#[allow(dead_code)]
+pub struct SearchOptions {
+    pub fuzzy: bool,
 }
 
 impl Default for FilterOptions {
@@ -142,12 +150,41 @@ pub fn apply_filters(notes: Vec<Note>, opts: &FilterOptions) -> Vec<Note> {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-pub fn search_notes(notes: Vec<Note>, query: &str) -> Vec<Note> {
+/// Search notes using either exact substring or fuzzy matching.
+/// When fuzzy=true, uses SkimMatcher for typo-tolerant, flexible search.
+/// When fuzzy=false, uses case-insensitive substring matching.
+pub fn search_notes(notes: Vec<Note>, query: &str, fuzzy: bool) -> Vec<Note> {
+    if fuzzy {
+        search_notes_fuzzy(notes, query)
+    } else {
+        search_notes_exact(notes, query)
+    }
+}
+
+/// Exact case-insensitive substring search
+fn search_notes_exact(notes: Vec<Note>, query: &str) -> Vec<Note> {
     let query_lower = query.to_lowercase();
     notes
         .into_iter()
         .filter(|n| n.body.to_lowercase().contains(&query_lower))
         .collect()
+}
+
+/// Fuzzy match search using Skim's matcher algorithm.
+/// Matches even with typos/skipped characters, orders by score (higher = better match).
+fn search_notes_fuzzy(notes: Vec<Note>, query: &str) -> Vec<Note> {
+    let matcher = SkimMatcherV2::default();
+
+    // Filter notes that have a fuzzy match, and assign scores
+    let mut scored: Vec<(Note, i64)> = notes
+        .into_iter()
+        .filter_map(|n| matcher.fuzzy_match(&n.body, query).map(|score| (n, score)))
+        .collect();
+
+    // Sort by score descending (better matches first)
+    scored.sort_by(|a, b| b.1.cmp(&a.1));
+
+    scored.into_iter().map(|(n, _)| n).collect()
 }
 
 // ── Log grouping ──────────────────────────────────────────────────────────────

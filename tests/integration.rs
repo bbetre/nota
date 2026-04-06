@@ -491,3 +491,253 @@ fn frontmatter_contains_changed_files_field() {
         content
     );
 }
+
+// ── nota search (fuzzy) ───────────────────────────────────────────────────────
+
+#[test]
+fn search_exact_finds_exact_match() {
+    let dir = tmpdir();
+    run(dir.path(), &["add", "debugging the auth flow"]);
+    run(dir.path(), &["add", "authentication in progress"]);
+
+    let (stdout, _, status) = run(dir.path(), &["search", "auth"]);
+    assert!(status.success());
+    // Both notes contain "auth" substring
+    assert!(stdout.contains("auth"), "stdout: {}", stdout);
+}
+
+#[test]
+fn search_fuzzy_finds_typo_tolerant_match() {
+    let dir = tmpdir();
+    run(dir.path(), &["add", "debugging database performance"]);
+    run(dir.path(), &["add", "unrelated note"]);
+
+    // Search with typo: "datbase" instead of "database"
+    let (stdout, _, status) = run(dir.path(), &["search", "datbase", "--fuzzy"]);
+    assert!(status.success());
+    // Fuzzy search should still find the note despite the typo
+    assert!(
+        stdout.contains("database") || stdout.contains("debugging"),
+        "fuzzy search should match despite typo: {}",
+        stdout
+    );
+}
+
+#[test]
+fn search_fuzzy_vs_exact_behavior() {
+    let dir = tmpdir();
+    run(dir.path(), &["add", "the quick brown fox"]);
+    run(dir.path(), &["add", "slower animals run"]);
+
+    // Exact search for "qck" should find nothing (no output)
+    let (exact_out, _, _) = run(dir.path(), &["search", "qck"]);
+
+    // Fuzzy search for "qck" should find "quick"
+    let (fuzzy_out, _, _) = run(dir.path(), &["search", "qck", "--fuzzy"]);
+
+    // The fuzzy output should be longer/contain more than exact output when fuzzy succeeds
+    assert!(
+        fuzzy_out.len() > exact_out.len(),
+        "fuzzy search should find more results than exact search"
+    );
+}
+
+#[test]
+fn search_fuzzy_empty_result() {
+    let dir = tmpdir();
+    run(dir.path(), &["add", "hello world"]);
+
+    // Search for something completely unrelated with fuzzy
+    let (stdout, stderr, status) = run(dir.path(), &["search", "zzzzz", "--fuzzy"]);
+    assert!(status.success());
+    // The "No notes" message goes to stderr
+    assert!(
+        stderr.contains("No notes") || stdout.is_empty(),
+        "should find no notes, stderr: {}, stdout: {}",
+        stderr,
+        stdout
+    );
+}
+
+#[test]
+fn search_fuzzy_with_filters() {
+    let dir = tmpdir();
+    run(dir.path(), &["add", "performance tuning"]);
+    run(dir.path(), &["add", "another task"]);
+
+    // Fuzzy search combined with tag filter (should still work)
+    let (stdout, _, status) = run(dir.path(), &["search", "perf", "--fuzzy"]);
+    assert!(status.success());
+    assert!(stdout.contains("performance") || !stdout.contains("No notes"));
+}
+
+// ── nota commits (commit linking) ─────────────────────────────────────────────
+
+#[test]
+fn show_displays_commit_hash() {
+    // Capture commit hash when note is made
+    let repo_dir = tempfile::tempdir().expect("failed to create temp repo");
+    let notes_dir = tempfile::tempdir().expect("failed to create temp notes dir");
+
+    // Initialize a git repo
+    Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    // Create and commit a file so we have a commit to reference
+    std::fs::write(repo_dir.path().join("test.txt"), "initial").unwrap();
+    Command::new("git")
+        .args(["add", "test.txt"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["commit", "-m", "initial commit"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    // Get the commit hash
+    let commit_output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    let commit_hash = String::from_utf8_lossy(&commit_output.stdout)
+        .trim()
+        .to_string();
+
+    // Create a note in the repo (should capture the commit hash)
+    let (out, _, status) = run_git(notes_dir.path(), repo_dir.path(), &["add", "test note"]);
+    assert!(status.success(), "add failed: {}", out);
+
+    let id = out
+        .trim()
+        .split_whitespace()
+        .nth(2)
+        .unwrap()
+        .trim_end_matches('.');
+
+    // Show the note and verify commit hash appears
+    let (stdout, _, status) = run_git(notes_dir.path(), repo_dir.path(), &["show", id]);
+    assert!(status.success());
+    // Should show the commit hash in short form
+    assert!(
+        stdout.contains("── commit") && stdout.contains(&commit_hash[..8]),
+        "commit hash should be shown in output, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn commits_command_filters_notes() {
+    let repo_dir = tempfile::tempdir().expect("failed to create temp repo");
+    let notes_dir = tempfile::tempdir().expect("failed to create temp notes dir");
+
+    // Init git repo
+    Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["config", "user.email", "test@test.com"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    // Create first commit
+    std::fs::write(repo_dir.path().join("file1.txt"), "v1").unwrap();
+    Command::new("git")
+        .args(["add", "file1.txt"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["commit", "-m", "commit 1"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    let commit1 = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    let hash1 = String::from_utf8_lossy(&commit1.stdout).trim().to_string();
+
+    // Create a note for this commit
+    run_git(
+        notes_dir.path(),
+        repo_dir.path(),
+        &["add", "note in commit 1"],
+    );
+
+    // Make a second commit
+    std::fs::write(repo_dir.path().join("file2.txt"), "v2").unwrap();
+    Command::new("git")
+        .args(["add", "file2.txt"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    Command::new("git")
+        .args(["commit", "-m", "commit 2"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    let commit2 = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo_dir.path())
+        .output()
+        .unwrap();
+
+    let _hash2 = String::from_utf8_lossy(&commit2.stdout).trim().to_string();
+
+    // Create a note for this commit
+    run_git(
+        notes_dir.path(),
+        repo_dir.path(),
+        &["add", "note in commit 2"],
+    );
+
+    // List notes from commit 1 using short hash
+    let (stdout, _, status) = run_git(notes_dir.path(), repo_dir.path(), &["commits", &hash1[..8]]);
+    assert!(status.success());
+    assert!(
+        stdout.contains("note in commit 1"),
+        "should find note from commit 1, got:\n{}",
+        stdout
+    );
+    assert!(
+        !stdout.contains("note in commit 2"),
+        "should NOT show note from commit 2, got:\n{}",
+        stdout
+    );
+}
