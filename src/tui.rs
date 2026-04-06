@@ -69,7 +69,11 @@ impl App {
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, note)| {
-                    if note.body.to_lowercase().contains(&self.search_query.to_lowercase()) {
+                    if note
+                        .body
+                        .to_lowercase()
+                        .contains(&self.search_query.to_lowercase())
+                    {
                         Some(idx)
                     } else {
                         None
@@ -133,7 +137,7 @@ impl App {
                 if !self.tag_input.is_empty() && !self.filtered_indices.is_empty() {
                     let note_idx = self.filtered_indices[self.selected];
                     let note_id = self.notes[note_idx].frontmatter.id.clone();
-                    
+
                     let note = &mut self.notes[note_idx];
                     for tag in self.tag_input.split_whitespace() {
                         let tag_lower = tag.to_lowercase();
@@ -141,7 +145,7 @@ impl App {
                             note.frontmatter.tags.push(tag_lower);
                         }
                     }
-                    
+
                     self.set_message(&format!("Added tags to note {}", note_id));
                 }
                 self.tag_input_mode = false;
@@ -198,7 +202,8 @@ pub fn run_tui(notes: Vec<Note>) -> Result<(), Box<dyn Error>> {
     result
 }
 
-fn setup_terminal() -> Result<Terminal<ratatui::prelude::CrosstermBackend<io::Stdout>>, Box<dyn Error>> {
+fn setup_terminal(
+) -> Result<Terminal<ratatui::prelude::CrosstermBackend<io::Stdout>>, Box<dyn Error>> {
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
     crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen)?;
@@ -233,7 +238,7 @@ fn run_app(
                 }
             }
         }
-        
+
         app.tick();
     }
 
@@ -299,7 +304,12 @@ fn render_preview(f: &mut ratatui::Frame, app: &App, area: ratatui::layout::Rect
 
     if let Some(note) = app.selected_note() {
         content.push(Line::from(vec![
-            Span::styled("ID: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "ID: ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(&note.frontmatter.id),
         ]));
 
@@ -316,7 +326,8 @@ fn render_preview(f: &mut ratatui::Frame, app: &App, area: ratatui::layout::Rect
         ]));
 
         if note.frontmatter.commit_hash != "none" {
-            let short_hash = &note.frontmatter.commit_hash[..8.min(note.frontmatter.commit_hash.len())];
+            let short_hash =
+                &note.frontmatter.commit_hash[..8.min(note.frontmatter.commit_hash.len())];
             content.push(Line::from(vec![
                 Span::styled("Commit: ", Style::default().fg(Color::Cyan)),
                 Span::raw(short_hash),
@@ -331,18 +342,20 @@ fn render_preview(f: &mut ratatui::Frame, app: &App, area: ratatui::layout::Rect
         }
 
         content.push(Line::from(""));
-        content.push(Line::from(
-            Span::styled("─── Body ───", Style::default().fg(Color::Gray))
-        ));
+        content.push(Line::from(Span::styled(
+            "─── Body ───",
+            Style::default().fg(Color::Gray),
+        )));
         content.push(Line::from(""));
 
         for line in note.body.lines() {
             content.push(Line::from(line));
         }
     } else {
-        content.push(Line::from(
-            Span::styled("No notes", Style::default().fg(Color::Red))
-        ));
+        content.push(Line::from(Span::styled(
+            "No notes",
+            Style::default().fg(Color::Red),
+        )));
     }
 
     let mut help_text = vec![
@@ -359,23 +372,32 @@ fn render_preview(f: &mut ratatui::Frame, app: &App, area: ratatui::layout::Rect
     }
 
     if app.tag_input_mode {
-        help_text = vec!["", "Tag mode: Type tags (space-separated), Enter to add, Esc to cancel"];
+        help_text = vec![
+            "",
+            "Tag mode: Type tags (space-separated), Enter to add, Esc to cancel",
+        ];
     }
 
     let mut help_lines: Vec<Line> = help_text.iter().map(|l| Line::from(*l)).collect();
-    
+
     // Add message if visible
     if !app.message.is_empty() && app.message_timeout > 0 {
-        help_lines.insert(0, Line::from(vec![
-            Span::styled(&app.message, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
-        ]));
+        help_lines.insert(
+            0,
+            Line::from(vec![Span::styled(
+                &app.message,
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )]),
+        );
         help_lines.insert(1, Line::from(""));
     }
 
     if app.tag_input_mode {
         help_lines.push(Line::from(vec![
             Span::raw("> "),
-            Span::styled(&app.tag_input, Style::default().fg(Color::Yellow))
+            Span::styled(&app.tag_input, Style::default().fg(Color::Yellow)),
         ]));
     }
 

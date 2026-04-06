@@ -174,7 +174,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             tag,
         } => cmd_list(limit, here, repo, branch, tag),
         Commands::Show { id } => cmd_show(&id),
-        Commands::Search { query, here, tag, fuzzy } => cmd_search(&query, here, tag, fuzzy),
+        Commands::Search {
+            query,
+            here,
+            tag,
+            fuzzy,
+        } => cmd_search(&query, here, tag, fuzzy),
         Commands::Context { repo, branch } => cmd_context(repo, branch),
         Commands::Log { days } => cmd_log(days),
         Commands::Delete { id } => cmd_delete(&id),
@@ -448,11 +453,12 @@ fn cmd_stats() -> Result<(), Box<dyn std::error::Error>> {
 
 fn cmd_commits(hash: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut notes = search::load_all_notes(&note::notes_dir());
-    
+
     // Filter notes by commit hash (match full or short hash)
     notes.retain(|n| {
         n.frontmatter.commit_hash.starts_with(hash)
-            || hash.starts_with(&n.frontmatter.commit_hash[..8.min(n.frontmatter.commit_hash.len())])
+            || hash
+                .starts_with(&n.frontmatter.commit_hash[..8.min(n.frontmatter.commit_hash.len())])
     });
 
     if notes.is_empty() {

@@ -166,11 +166,7 @@ pub fn print_changed_files(staged: &[String], unstaged: &[String], untracked: &[
 pub fn print_commit_info(commit_hash: &str) {
     if commit_hash != "none" {
         let short_hash = &commit_hash[..8.min(commit_hash.len())];
-        println!(
-            "\n{} {}",
-            "── commit ".dimmed(),
-            short_hash.cyan()
-        );
+        println!("\n{} {}", "── commit ".dimmed(), short_hash.cyan());
     }
 }
 
