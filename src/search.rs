@@ -316,6 +316,7 @@ mod tests {
                 directory: dir.to_string(),
                 git_repo: repo.to_string(),
                 git_branch: branch.to_string(),
+                commit_hash: "none".to_string(),
                 tags: tags.into_iter().map(String::from).collect(),
                 changed_files: Vec::new(),
                 unstaged_files: Vec::new(),
@@ -479,7 +480,7 @@ mod tests {
                 "unrelated note",
             ),
         ];
-        let result = search_notes(notes, "auth");
+        let result = search_notes(notes, "auth", false, false);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].frontmatter.id, "a");
     }
